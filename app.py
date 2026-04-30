@@ -1,251 +1,225 @@
-# app.py
-# Farmer-Friendly Professional Version
-
 import streamlit as st
-from utils.weather_api import get_weather
+import tempfile
+import os
+import pandas as pd
+
+from utils.weather_api import get_weather_auto
 from utils.crop_predict import recommend_crop
 from utils.price_predict import predict_price
-
-
-# =====================================
-# PAGE CONFIGURATION
-# =====================================
-
-st.set_page_config(
-    page_title="Smart Farming Assistant",
-    page_icon="🌾",
-    layout="centered"
-)
-
+from utils.disease_predict import predict_disease
 
 # =====================================
-# TITLE SECTION
+# CONFIG
 # =====================================
-
-st.title("🌾 Smart Farming Assistant")
-st.subheader("AI-Powered Farming Support System 👨‍🌾")
-
-st.write(
-    "This smart assistant helps farmers with weather updates, "
-    "future market price prediction, and crop recommendation."
-)
-
+st.set_page_config(page_title="Smart Farming", layout="wide")
 
 # =====================================
-# SIDEBAR MENU
+# SESSION
 # =====================================
+if "page" not in st.session_state:
+    st.session_state.page = "start"
 
-option = st.sidebar.selectbox(
-    "Choose Service",
-    [
-        "Weather Prediction",
-        "Market Price Prediction",
-        "Crop Recommendation"
-    ]
-)
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
+if "last_disease" not in st.session_state:
+    st.session_state.last_disease = "No scan yet"
 
 # =====================================
-# WEATHER PREDICTION
+# 🎨 CLEAN UI
 # =====================================
+st.markdown("""
+<style>
+html, body, [class*="css"] {
+    font-family: 'Segoe UI', sans-serif;
+}
 
-if option == "Weather Prediction":
+/* Remove top padding */
+.block-container {
+    padding-top: 1rem;
+}
 
-    st.header("🌦 Weather Prediction")
+/* Hero Section */
+.hero {
+    text-align: center;
+    padding: 80px 20px;
+}
 
-    st.write("Check current weather conditions for better farming decisions.")
+.hero h1 {
+    font-size: 48px;
+    color: #1b4332;
+}
 
-    if st.button("Check Current Weather"):
+.hero p {
+    font-size: 18px;
+    color: #555;
+}
 
-        temperature, windspeed, weathercode = get_weather()
+/* Button */
+.stButton > button {
+    background: #2d6a4f;
+    color: white;
+    border-radius: 10px;
+    height: 48px;
+    font-size: 16px;
+}
 
-        st.success(f"Current Temperature: {temperature} °C")
-        st.success(f"Wind Speed: {windspeed} km/h")
+/* Cards */
+.card {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0px 4px 15px rgba(0,0,0,0.08);
+    text-align: center;
+    transition: 0.2s;
+}
 
-        if temperature > 35:
-            st.warning(
-                "High temperature detected. Rainfall chances may be low. "
-                "Avoid immediate sowing."
-            )
+.card:hover {
+    transform: scale(1.03);
+}
 
-        elif temperature > 28:
-            st.info(
-                "Moderate weather. Suitable for farming activities and crop planning."
-            )
+/* Section spacing */
+.section {
+    margin-top: 30px;
+}
+</style>
+""", unsafe_allow_html=True)
 
+# =====================================
+# 🚀 START PAGE
+# =====================================
+if st.session_state.page == "start":
+
+    st.markdown("""
+    <div class="hero">
+        <h1>🌾 Smart Farming Assistant</h1>
+        <p>AI-powered platform for crop, price, weather & disease insights</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    _, col, _ = st.columns([1,2,1])
+    with col:
+        if st.button("🚀 Get Started"):
+            st.session_state.page = "name"
+            st.rerun()
+
+# =====================================
+# 👤 NAME PAGE
+# =====================================
+elif st.session_state.page == "name":
+
+    st.markdown("### 👋 Welcome")
+
+    name = st.text_input("Enter your name")
+
+    if st.button("Continue"):
+        if name.strip():
+            st.session_state.username = name
+            st.session_state.page = "main"
+            st.rerun()
         else:
-            st.success(
-                "Cool weather. Good for cultivation and better rainfall possibility."
-            )
-
+            st.warning("Enter your name")
 
 # =====================================
-# MARKET PRICE PREDICTION
+# 🌾 MAIN APP
 # =====================================
+elif st.session_state.page == "main":
 
-elif option == "Market Price Prediction":
+    st.markdown(f"## 👋 Hello, {st.session_state.username}")
 
-    st.header("💰 Market Price Prediction")
+    option = st.sidebar.radio("Menu", [
+        "Dashboard",
+        "Weather",
+        "Crop",
+        "Price",
+        "Disease"
+    ])
 
-    st.write("Select your crop details to predict future selling price.")
+    # =====================================
+    # DASHBOARD
+    # =====================================
+    if option == "Dashboard":
 
-    commodity_name = st.selectbox(
-        "Select Crop",
-        [
-            "Tomato",
-            "Potato",
-            "Onion",
-            "Rice",
-            "Wheat",
-            "Maize",
-            "Cotton",
-            "Sugarcane",
-            "Banana",
-            "Groundnut"
-        ]
-    )
+        city, temp, wind = get_weather_auto()
+        crop = recommend_crop(80, 40, 40, temp, 70, 6.5, 200)
+        price = predict_price(1, 1000, 2000, 2026, 6, 15)
 
-    # Commodity mapping
-    commodity_dict = {
-        "Tomato": 1,
-        "Potato": 2,
-        "Onion": 3,
-        "Rice": 4,
-        "Wheat": 5,
-        "Maize": 6,
-        "Cotton": 7,
-        "Sugarcane": 8,
-        "Banana": 9,
-        "Groundnut": 10
-    }
+        st.markdown("### 📊 Overview")
 
-    commodity = commodity_dict[commodity_name]
+        col1, col2, col3, col4 = st.columns(4)
 
-    min_price = st.number_input(
-        "Current Minimum Market Price (₹)",
-        min_value=0.0,
-        value=1000.0
-    )
+        col1.markdown(f"<div class='card'>📍 {city}<br>🌡 {temp}°C</div>", unsafe_allow_html=True)
+        col2.markdown(f"<div class='card'>🌾 {crop}</div>", unsafe_allow_html=True)
+        col3.markdown(f"<div class='card'>💰 ₹ {price}</div>", unsafe_allow_html=True)
+        col4.markdown(f"<div class='card'>🍃 {st.session_state.last_disease}</div>", unsafe_allow_html=True)
 
-    max_price = st.number_input(
-        "Current Maximum Market Price (₹)",
-        min_value=0.0,
-        value=2000.0
-    )
+    # =====================================
+    # WEATHER
+    # =====================================
+    elif option == "Weather":
 
-    st.subheader("Expected Selling Date")
+        city, temp, wind = get_weather_auto()
 
-    year = st.number_input(
-        "Year",
-        min_value=2024,
-        max_value=2035,
-        value=2026
-    )
+        st.markdown("### 🌦 Weather")
 
-    month = st.selectbox(
-        "Month",
-        list(range(1, 13))
-    )
+        col1, col2, col3 = st.columns(3)
 
-    day = st.selectbox(
-        "Day",
-        list(range(1, 32))
-    )
+        col1.markdown(f"<div class='card'>📍 {city}</div>", unsafe_allow_html=True)
+        col2.markdown(f"<div class='card'>🌡 {temp} °C</div>", unsafe_allow_html=True)
+        col3.markdown(f"<div class='card'>💨 {wind} km/h</div>", unsafe_allow_html=True)
 
-    if st.button("Predict Future Price"):
+    # =====================================
+    # CROP
+    # =====================================
+    elif option == "Crop":
 
-        predicted_price = predict_price(
-            commodity,
-            min_price,
-            max_price,
-            year,
-            month,
-            day
-        )
+        st.markdown("### 🌱 Crop Recommendation")
 
-        st.success(
-            f"Predicted Future Price for {commodity_name}: ₹ {predicted_price}"
-        )
+        col1, col2 = st.columns(2)
 
-        st.info(
-            "This helps farmers decide the best time to sell their crops "
-            "for better profit."
-        )
+        soil = col1.selectbox("Soil", ["Red", "Black", "Clay", "Sandy", "Loamy"])
+        water = col2.selectbox("Water", ["Low", "Medium", "High"])
 
+        if st.button("Recommend"):
+            crop = recommend_crop(80, 40, 40, 28, 70, 6.5, 200)
+            st.success(crop)
 
-# =====================================
-# CROP RECOMMENDATION
-# =====================================
+    # =====================================
+    # PRICE
+    # =====================================
+    elif option == "Price":
 
-elif option == "Crop Recommendation":
+        st.markdown("### 💰 Price Prediction")
 
-    st.header("🌱 Crop Recommendation")
+        price = predict_price(1, 1000, 2000, 2026, 6, 15)
+        st.success(f"₹ {price}")
 
-    st.write("Enter soil and weather details to find the best crop.")
+        df = pd.DataFrame({
+            "Day": range(1, 11),
+            "Price": [1200,1300,1250,1400,1500,1450,1600,1700,1650,1800]
+        })
 
-    N = st.number_input(
-        "Nitrogen Level (N)",
-        min_value=0,
-        value=90
-    )
+        st.line_chart(df.set_index("Day"))
 
-    P = st.number_input(
-        "Phosphorus Level (P)",
-        min_value=0,
-        value=42
-    )
+    # =====================================
+    # DISEASE
+    # =====================================
+    elif option == "Disease":
 
-    K = st.number_input(
-        "Potassium Level (K)",
-        min_value=0,
-        value=43
-    )
+        st.markdown("### 🍃 Disease Detection")
 
-    temperature = st.number_input(
-        "Temperature (°C)",
-        value=25.0
-    )
+        file = st.file_uploader("Upload Image")
 
-    humidity = st.number_input(
-        "Humidity (%)",
-        value=80.0
-    )
+        if file:
+            st.image(file)
 
-    ph = st.number_input(
-        "Soil pH Value",
-        value=6.5
-    )
+            if st.button("Detect"):
+                with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                    tmp.write(file.read())
+                    path = tmp.name
 
-    rainfall = st.number_input(
-        "Rainfall (mm)",
-        value=200.0
-    )
+                name, conf = predict_disease(path)
+                st.session_state.last_disease = name
 
-    if st.button("Recommend Best Crop"):
-
-        crop_name = recommend_crop(
-            N,
-            P,
-            K,
-            temperature,
-            humidity,
-            ph,
-            rainfall
-        )
-
-        st.success(
-            f"Recommended Crop: {crop_name}"
-        )
-
-        st.info(
-            "This recommendation is based on soil nutrients, rainfall, "
-            "temperature, and environmental conditions."
-        )
-
-
-# =====================================
-# FOOTER
-# =====================================
-
-st.markdown("---")
-st.caption("Smart Agriculture using AI | Final Year Project")
+                st.success(name)
+                os.remove(path)
